@@ -1,0 +1,109 @@
+// Prisma schema for the AI software trading platform.
+// Demanders post requirements; the platform matches developers, testers and ops providers.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  DEMANDER
+  PROVIDER
+  ADMIN
+}
+
+enum ProviderTrack {
+  DEV
+  TEST
+  OPS
+}
+
+enum RequirementCategory {
+  DEV
+  TEST
+  OPS
+}
+
+enum RequirementStatus {
+  OPEN
+  MATCHING
+  IN_PROGRESS
+  DELIVERED
+  CLOSED
+  CANCELLED
+}
+
+enum ApplicationStatus {
+  PENDING
+  SHORTLISTED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  providerProfile ProviderProfile?
+  requirements    Requirement[]    @relation("RequirementOwner")
+  applications    Application[]
+}
+
+model ProviderProfile {
+  id              String        @id @default(cuid())
+  userId          String        @unique
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track           ProviderTrack
+  headline        String
+  bio             String
+  hourlyRate      Float?
+  yearsExperience Int?
+  tags            String // comma-separated skill tags, e.g. "react,node,postgres"
+  portfolioUrl    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Requirement {
+  id          String              @id @default(cuid())
+  ownerId     String
+  owner       User                @relation("RequirementOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  title       String
+  description String
+  category    RequirementCategory
+  tags        String // comma-separated tags
+  budgetMin   Float?
+  budgetMax   Float?
+  deadline    DateTime?
+  status      RequirementStatus   @default(OPEN)
+  aiSummary   String? // AI-extracted structured summary (skills/estimate), nullable
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  applications Application[]
+}
+
+model Application {
+  id            String            @id @default(cuid())
+  requirementId String
+  requirement   Requirement       @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  providerId    String
+  provider      User              @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  status        ApplicationStatus @default(PENDING)
+  message       String?
+  matchScore    Float? // AI/rule-based match score at time of application or suggestion
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@unique([requirementId, providerId])
+}
